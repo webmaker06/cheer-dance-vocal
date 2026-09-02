@@ -12,44 +12,25 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+  import { joinRoom } from 'https://cdn.skypack.dev/trystero/torrent';
 
-    // --- YOUR FIREBASE CONFIG HERE ---
-    // Replace with your Firebase credentials to enable online multi-device live sync
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-      projectId: "YOUR_PROJECT",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "123456789",
-      appId: "YOUR_APP_ID"
-    };
+  // Room ID based on contest title
+  const roomId = 'singing-contest-room-2026';
+  const room = joinRoom({ appId: 'judging-scorecard-app' }, roomId);
+  const [sendScoreData, getScoreData] = room.makeAction('scoreUpdate');
 
-    // Initialize Firebase if configured, otherwise fallback to local mode
-    let db = null;
-    if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
-      const app = initializeApp(firebaseConfig);
-      db = getDatabase(app);
-      window.isOnlineMode = true;
-    } else {
-      window.isOnlineMode = false;
-    }
+  // Broadcast local changes to all connected devices
+  window.syncOnlineData = function(data) {
+    sendScoreData(data);
+  };
 
-    window.syncFirebaseData = function(data) {
-      if (db) set(ref(db, 'contestData'), data);
-    };
-
-    window.listenFirebaseData = function(callback) {
-      if (db) {
-        onValue(ref(db, 'contestData'), (snapshot) => {
-          const val = snapshot.val();
-          if (val) callback(val);
-        });
-      }
-    };
-  </script>
+  // Receive live updates from other devices
+  getScoreData((remoteData) => {
+    data = remoteData;
+    localStorage.setItem('scorecardData', JSON.stringify(data));
+    renderActiveView();
+  });
+</script>
 
   <style>
     * { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
@@ -300,8 +281,9 @@
     let currentUser = JSON.parse(sessionStorage.getItem('scorecardUser')) || null;
 
     function saveData() {
-      localStorage.setItem('scorecardData', JSON.stringify(data));
-      if (window.syncFirebaseData) window.syncFirebaseData(data);
+  localStorage.setItem('scorecardData', JSON.stringify(data));
+  if (window.syncOnlineData) window.syncOnlineData(data);
+}
     }
 
     // Helper function to hash passwords via Web Crypto API
